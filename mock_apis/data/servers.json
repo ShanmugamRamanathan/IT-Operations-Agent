@@ -1,0 +1,64 @@
+{
+  "servers": [
+    {
+      "hostname": "PRD-APP-01",
+      "ip": "10.0.1.10",
+      "status": "running",
+      "cpu_percent": 45.2,
+      "memory_percent": 68.5,
+      "disk_percent": 55.0,
+      "os": "Windows Server 2022",
+      "role": "Application Server",
+      "location": "Datacenter-1",
+      "last_updated": "2025-12-26T10:30:00Z"
+    },
+    {
+      "hostname": "PRD-APP-02",
+      "ip": "10.0.1.11",
+      "status": "running",
+      "cpu_percent": 78.3,
+      "memory_percent": 85.1,
+      "disk_percent": 72.0,
+      "os": "Windows Server 2022",
+      "role": "Application Server",
+      "location": "Datacenter-1",
+      "last_updated": "2025-12-26T10:30:00Z"
+    },
+    {
+      "hostname": "PRD-DB-01",
+      "ip": "10.0.2.10",
+      "status": "down",
+      "cpu_percent": 0.0,
+      "memory_percent": 0.0,
+      "disk_percent": 0.0,
+      "os": "Windows Server 2022",
+      "role": "Database Server",
+      "location": "Datacenter-2",
+      "last_updated": "2025-12-26T08:15:00Z"
+    },
+    {
+      "hostname": "DEV-APP-01",
+      "ip": "10.0.10.10",
+      "status": "running",
+      "cpu_percent": 23.4,
+      "memory_percent": 42.0,
+      "disk_percent": 38.0,
+      "os": "Windows Server 2019",
+      "role": "Development Server",
+      "location": "Datacenter-1",
+      "last_updated": "2025-12-26T10:30:00Z"
+    },
+    {
+      "hostname": "PRD-WEB-01",
+      "ip": "10.0.1.20",
+      "status": "running",
+      "cpu_percent": 35.5,
+      "memory_percent": 55.0,
+      "disk_percent": 45.0,
+      "os": "Windows Server 2022",
+      "role": "Web Server",
+      "location": "Datacenter-1",
+      "last_updated": "2025-12-26T14:00:00Z"
+    }
+  ]
+}
