@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Service 1: Web Server (like PRD-WEB-01)
+  web-server:
+    image: nginx:latest
+    container_name: prod-web-01
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    labels:
+      environment: "production"
+      role: "web-server"
+
+  # Service 2: Application Server (like PRD-APP-01)
+  app-server:
+    image: python:3.11-slim
+    container_name: prod-app-01
+    command: python -m http.server 8000
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    labels:
+      environment: "production"
+      role: "app-server"
+
+  # Service 3: Database (like PRD-DB-01)
+  database:
+    image: postgres:15
+    container_name: prod-db-01
+    environment:
+      POSTGRES_PASSWORD: demo123
+      POSTGRES_DB: monitoring_demo
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    labels:
+      environment: "production"
+      role: "database"
+
+  # Service 4: Cache (like PRD-CACHE-01)
+  cache:
+    image: redis:7
+    container_name: prod-cache-01
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    labels:
+      environment: "production"
+      role: "cache"
