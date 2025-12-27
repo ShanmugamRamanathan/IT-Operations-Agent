@@ -47,7 +47,7 @@ ALERT_LEVELS = {
     "SUCCESS": {
         "emoji": "✅",
         "color": "green",
-        "send_email": False  # Optional: set True if you want success emails
+        "send_email": True  # Optional: set True if you want success emails
     }
 }
 

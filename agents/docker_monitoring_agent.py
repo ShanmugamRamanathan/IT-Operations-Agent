@@ -1,3 +1,15 @@
+"""
+Monitoring Agent
+Real-time Docker container monitoring with LLM-based analysis.
+Uses Docker API to detect container issues and provides intelligent insights.
+"""
+
+# Add project root to Python path
+import sys
+from pathlib import Path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import json
 from typing import Any, Dict
 from datetime import datetime
@@ -35,9 +47,15 @@ def get_docker_client():
 
 @tool
 def list_all_containers() -> Dict[str, Any]:
-    """List all Docker containers (running and stopped) with their status."""
+    """
+    List all Docker containers with 'environment' label (managed containers only).
+    Returns both running and stopped containers.
+    """
     client = get_docker_client()
-    containers = client.containers.list(all=True)
+    all_containers = client.containers.list(all=True)
+    
+    # Filter: Only containers with 'environment' label
+    containers = [c for c in all_containers if 'environment' in c.labels]
     
     result = []
     for c in containers:
@@ -46,7 +64,38 @@ def list_all_containers() -> Dict[str, Any]:
             "id": c.short_id,
             "status": c.status,  # running, exited, paused
             "image": c.image.tags[0] if c.image.tags else "unknown",
-            "labels": c.labels
+            "environment": c.labels.get("environment", "unknown"),
+            "role": c.labels.get("role", "unknown"),
+            "health": "healthy" if c.status == "running" else "unhealthy"
+        })
+    
+    return {
+        "total": len(result),
+        "containers": result
+    }
+
+
+@tool
+def list_running_containers() -> Dict[str, Any]:
+    """
+    List only containers that are currently running.
+    Only monitors containers with 'environment' label.
+    """
+    client = get_docker_client()
+    all_containers = client.containers.list(filters={"status": "running"})
+    
+    # Filter: Only containers with 'environment' label
+    containers = [c for c in all_containers if 'environment' in c.labels]
+    
+    result = []
+    for c in containers:
+        result.append({
+            "name": c.name,
+            "id": c.short_id,
+            "status": c.status,
+            "image": c.image.tags[0] if c.image.tags else "unknown",
+            "environment": c.labels.get("environment", "unknown"),
+            "role": c.labels.get("role", "unknown")
         })
     
     return {
@@ -57,7 +106,10 @@ def list_all_containers() -> Dict[str, Any]:
 
 @tool
 def get_container_status(container_name: str) -> Dict[str, Any]:
-    """Get detailed status and resource usage for a specific container."""
+    """
+    Get detailed status and resource usage for a specific container.
+    Returns health status, uptime, ports, and configuration.
+    """
     client = get_docker_client()
     
     try:
@@ -73,7 +125,10 @@ def get_container_status(container_name: str) -> Dict[str, Any]:
         "image": container.image.tags[0] if container.image.tags else "unknown",
         "created": container.attrs['Created'],
         "started_at": container.attrs['State'].get('StartedAt', 'N/A'),
-        "labels": container.labels,
+        "finished_at": container.attrs['State'].get('FinishedAt', 'N/A'),
+        "exit_code": container.attrs['State'].get('ExitCode', 'N/A'),
+        "environment": container.labels.get("environment", "unknown"),
+        "role": container.labels.get("role", "unknown"),
         "ports": container.attrs['NetworkSettings']['Ports'],
         "health": "healthy" if container.status == "running" else "unhealthy"
     }
@@ -81,7 +136,10 @@ def get_container_status(container_name: str) -> Dict[str, Any]:
 
 @tool
 def get_container_logs(container_name: str, lines: int = 20) -> Dict[str, Any]:
-    """Get recent logs from a container."""
+    """
+    Get recent logs from a container to diagnose issues.
+    Returns last N lines of logs with timestamps.
+    """
     client = get_docker_client()
     
     try:
@@ -103,54 +161,34 @@ def get_container_logs(container_name: str, lines: int = 20) -> Dict[str, Any]:
 
 
 @tool
-def restart_container(container_name: str) -> Dict[str, Any]:
-    """Restart a container. Use this when a container is unhealthy or stopped."""
+def check_unhealthy_containers() -> Dict[str, Any]:
+    """
+    Quick check to find all unhealthy (stopped/exited) containers.
+    Returns list of containers that need attention.
+    """
     client = get_docker_client()
+    all_containers = client.containers.list(all=True)
     
-    try:
-        container = client.containers.get(container_name)
-    except NotFound:
-        return {"error": f"Container '{container_name}' not found"}
+    # Filter: Only containers with 'environment' label
+    containers = [c for c in all_containers if 'environment' in c.labels]
     
-    try:
-        old_status = container.status
-        container.restart(timeout=10)
-        # Reload to get new status
-        container.reload()
-        return {
-            "success": True,
-            "container": container_name,
-            "message": f"Container {container_name} restarted successfully",
-            "old_status": old_status,
-            "new_status": container.status
-        }
-    except APIError as e:
-        return {
-            "success": False,
-            "container": container_name,
-            "error": str(e)
-        }
-
-
-@tool
-def list_running_containers() -> Dict[str, Any]:
-    """List only containers that are currently running."""
-    client = get_docker_client()
-    containers = client.containers.list(filters={"status": "running"})
-    
-    result = []
+    unhealthy = []
     for c in containers:
-        result.append({
-            "name": c.name,
-            "id": c.short_id,
-            "status": c.status,
-            "image": c.image.tags[0] if c.image.tags else "unknown",
-            "labels": c.labels
-        })
+        if c.status != "running":
+            unhealthy.append({
+                "name": c.name,
+                "status": c.status,
+                "image": c.image.tags[0] if c.image.tags else "unknown",
+                "environment": c.labels.get("environment", "unknown"),
+                "role": c.labels.get("role", "unknown"),
+                "exit_code": c.attrs['State'].get('ExitCode', 'N/A')
+            })
     
     return {
-        "total": len(result),
-        "containers": result
+        "total_checked": len(containers),
+        "unhealthy_count": len(unhealthy),
+        "unhealthy_containers": unhealthy,
+        "all_healthy": len(unhealthy) == 0
     }
 
 
@@ -163,7 +201,7 @@ TOOLS = [
     list_running_containers,
     get_container_status,
     get_container_logs,
-    restart_container
+    check_unhealthy_containers
 ]
 
 TOOL_MAP = {t.name: t for t in TOOLS}
@@ -179,14 +217,22 @@ Your role:
 - Monitor Docker containers (web servers, databases, caches, applications)
 - Report on container health and status
 - Help diagnose issues by checking logs
-- Suggest actions when containers are unhealthy
+- Identify containers that need attention
 
 CRITICAL RULES:
 - Base all answers ONLY on tool results you receive
 - Do not invent container names, IDs, or logs
-- If a container is down, clearly state this and suggest restarting
+- If a container is down, clearly state this and recommend notifying the incident response team
 - Be concise and actionable
-- When asked about "all" containers, use list_all_containers or list_running_containers
+- When asked about "all" containers, use list_all_containers or check_unhealthy_containers
+- You ONLY monitor and report - you do NOT restart containers (that's the incident response agent's job)
+
+Available tools:
+- list_all_containers: See all managed containers
+- list_running_containers: See only running containers
+- get_container_status: Get details about a specific container
+- get_container_logs: Read recent logs from a container
+- check_unhealthy_containers: Find all containers that are down or unhealthy
 """
 
 
@@ -194,10 +240,23 @@ CRITICAL RULES:
 # Agent Function
 # -------------------------
 
-def ask_docker_agent(question: str, max_iterations: int = 3) -> str:
+def monitor_containers(question: str, max_iterations: int = 3) -> str:
     """
-    Docker monitoring agent using LangChain tool calling.
-    Monitors real Docker containers and can take actions.
+    Docker monitoring agent using LLM-based analysis.
+    Monitors real Docker containers and provides intelligent insights.
+    
+    Args:
+        question: Natural language question about container status
+        max_iterations: Maximum tool calling iterations
+    
+    Returns:
+        Natural language response with monitoring insights
+    
+    Examples:
+        - "Are all containers healthy?"
+        - "What's wrong with prod-web-01?"
+        - "Show me logs from the database"
+        - "List all running containers"
     """
     llm = ChatOllama(model=OLLAMA_MODEL, temperature=0).bind_tools(TOOLS)
     messages = [HumanMessage(content=SYSTEM_PROMPT + "\n\nUser question: " + question)]
@@ -238,12 +297,26 @@ def ask_docker_agent(question: str, max_iterations: int = 3) -> str:
 
 
 # -------------------------
-# Main - Test Cases
+# Direct Functions (for orchestrator if needed)
+# -------------------------
+
+def get_all_containers() -> Dict[str, Any]:
+    """Direct function to get all containers (no LLM)."""
+    return list_all_containers.invoke({})
+
+
+def get_unhealthy_containers() -> Dict[str, Any]:
+    """Direct function to check unhealthy containers (no LLM)."""
+    return check_unhealthy_containers.invoke({})
+
+
+# -------------------------
+# Testing
 # -------------------------
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("🐳 DOCKER MONITORING AGENT")
+    print("🐳 DOCKER MONITORING AGENT TEST")
     print("=" * 80)
     
     # Check Docker is accessible
@@ -258,20 +331,24 @@ if __name__ == "__main__":
     
     # Test questions
     test_questions = [
+        "Are all containers healthy?",
         "List all running containers",
         "What is the status of prod-web-01?",
-        "Show me logs from prod-db-01",
-        "Are there any containers that need attention?",
-        "Restart prod-web-01"
+        "Show me the last 10 logs from prod-db-01",
+        "Which containers need attention?"
     ]
     
-    for q in test_questions:
+    for i, q in enumerate(test_questions, 1):
         print("\n" + "=" * 80)
-        print(f"Q: {q}")
+        print(f"[TEST {i}] {q}")
         print("=" * 80)
         try:
-            response = ask_docker_agent(q)
+            response = monitor_containers(q)
             print(response)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"❌ Error: {e}")
         print()
+    
+    print("=" * 80)
+    print("✅ Tests Complete")
+    print("=" * 80)
