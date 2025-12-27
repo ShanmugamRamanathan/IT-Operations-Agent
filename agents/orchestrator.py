@@ -1,6 +1,6 @@
 """
 Orchestrator Agent
-Coordinates monitoring, alerting, and healing actions.
+Coordinates monitoring, alerting, and healing actions with AI-powered diagnostics.
 """
 
 # Add project root to Python path
@@ -14,13 +14,14 @@ import argparse
 from datetime import datetime
 from typing import Dict, Any
 
-# Fixed imports - removed monitoring_agent (not needed)
 from agents.alert_manager_agent import send_container_down_alert
 from agents.incident_response_agent import (
     get_health_status,
     heal_container,
     heal_all_containers
 )
+# Import LLM-based monitoring for intelligent diagnosis
+from agents.docker_monitoring_agent import monitor_containers
 
 from config.config import MONITORING_INTERVAL_SECONDS
 
@@ -31,13 +32,14 @@ from config.config import MONITORING_INTERVAL_SECONDS
 
 def orchestrate_check_only() -> Dict[str, Any]:
     """
-    ONE-TIME health check (no healing, only monitoring + alerting).
+    ONE-TIME health check with AI-powered diagnosis.
+    No healing - only monitoring, AI analysis, and alerting.
     
     Returns:
         Dict with health status and any alerts sent
     """
     print("=" * 80)
-    print("🔍 ONE-TIME HEALTH CHECK")
+    print("🔍 ONE-TIME HEALTH CHECK (AI-Powered Diagnosis)")
     print("=" * 80)
     print()
     
@@ -62,30 +64,90 @@ def orchestrate_check_only() -> Dict[str, Any]:
         for container in health['stopped_containers']:
             container_name = container['name']
             status = container['status']
+            role = container.get('role', 'unknown')
             
-            print(f"\n🚨 Incident Detected: {container_name} is {status}")
-            print(f"⚠️  CHECK MODE: Not healing, only alerting")
+            print(f"\n{'=' * 80}")
+            print(f"🚨 INCIDENT DETECTED: {container_name}")
+            print(f"   Role: {role}")
+            print(f"   Status: {status}")
+            print(f"   Mode: CHECK ONLY (no auto-healing)")
+            print("=" * 80)
             
-            # Send alert using your email function
-            print(f"📧 Sending alert...")
+            # ================================
+            # AI DIAGNOSIS - Step 1: Check Status
+            # ================================
+            print(f"\n🤖 AI Analysis Step 1: Checking container details...")
+            print("-" * 80)
+            try:
+                status_analysis = monitor_containers(
+                    f"Get detailed status of {container_name} including when it stopped and exit code"
+                )
+                print(status_analysis)
+            except Exception as e:
+                print(f"⚠️  AI analysis failed: {e}")
+            print("-" * 80)
             
-            # Create mock auto_heal_result for alert (no healing in check mode)
+            # ================================
+            # AI DIAGNOSIS - Step 2: Check Logs
+            # ================================
+            print(f"\n🤖 AI Analysis Step 2: Analyzing recent logs...")
+            print("-" * 80)
+            try:
+                log_analysis = monitor_containers(
+                    f"Show me the last 15 lines of logs from {container_name} and identify any errors or warnings"
+                )
+                print(log_analysis)
+            except Exception as e:
+                print(f"⚠️  Log analysis failed: {e}")
+            print("-" * 80)
+            
+            # ================================
+            # AI DIAGNOSIS - Step 3: Root Cause Analysis
+            # ================================
+            print(f"\n🤖 AI Analysis Step 3: Root cause diagnosis...")
+            print("-" * 80)
+            try:
+                root_cause = monitor_containers(
+                    f"Based on the status and logs of {container_name}, what are the most likely causes for this failure? "
+                    f"Consider: configuration issues, resource constraints, dependency failures, or application errors."
+                )
+                print(root_cause)
+            except Exception as e:
+                print(f"⚠️  Root cause analysis failed: {e}")
+            print("-" * 80)
+            
+            # Send alert with diagnosis summary
+            print(f"\n📧 Sending alert to operations team...")
             alert_result = send_container_down_alert(
                 container_name=container_name,
                 auto_heal_result={
                     "success": False,
-                    "error": "Check mode - no healing attempted",
+                    "error": "Check mode - no healing attempted (awaiting manual intervention)",
                     "old_status": status,
                     "attempts": 0
                 }
             )
             
             if alert_result.get('success'):
-                print(f"   ✅ Alert sent")
+                print(f"   ✅ Alert sent successfully")
             else:
-                print(f"   ⚠️  Alert logged (email may not be sent)")
+                print(f"   ⚠️  Alert logged to file")
+            
+            print(f"\n{'=' * 80}\n")
     else:
-        print("✅ All containers healthy")
+        print("\n✅ All containers healthy")
+        
+        # Optional: Get AI health summary even when all is well
+        print(f"\n🤖 AI Health Summary:")
+        print("-" * 80)
+        try:
+            summary = monitor_containers(
+                "All containers are running. Provide a brief health summary and any recommendations."
+            )
+            print(summary)
+        except Exception as e:
+            print(f"⚠️  Summary generation failed: {e}")
+        print("-" * 80)
     
     print()
     print("=" * 80)
@@ -97,13 +159,14 @@ def orchestrate_check_only() -> Dict[str, Any]:
 
 def orchestrate_heal_once() -> Dict[str, Any]:
     """
-    ONE-TIME healing cycle (monitor + heal + alert).
+    ONE-TIME healing cycle with AI-powered diagnosis.
+    Monitor + AI diagnosis + auto-heal + alert.
     
     Returns:
         Dict with health status and healing results
     """
     print("=" * 80)
-    print("🔧 ONE-TIME AUTO-HEAL")
+    print("🔧 ONE-TIME AUTO-HEAL (AI-Powered Diagnosis)")
     print("=" * 80)
     print()
     
@@ -124,35 +187,116 @@ def orchestrate_heal_once() -> Dict[str, Any]:
     if stopped_count > 0:
         print(f"⚠️  Found {stopped_count} unhealthy container(s)")
         
-        # HEAL MODE - ATTEMPT HEALING
+        # HEAL MODE - AI DIAGNOSIS + AUTO-HEALING
         for container in health['stopped_containers']:
             container_name = container['name']
             status = container['status']
+            role = container.get('role', 'unknown')
             
-            print(f"\n🚨 Incident Detected: {container_name} is {status}")
-            print(f"🔧 HEAL MODE: Attempting auto-heal...")
+            print(f"\n{'=' * 80}")
+            print(f"🚨 INCIDENT DETECTED: {container_name}")
+            print(f"   Role: {role}")
+            print(f"   Status: {status}")
+            print(f"   Mode: HEAL (AI diagnosis + auto-restart)")
+            print("=" * 80)
             
-            # Attempt to heal
+            # ================================
+            # AI DIAGNOSIS - Before Healing
+            # ================================
+            print(f"\n🤖 Pre-Healing AI Diagnosis:")
+            print("-" * 80)
+            
+            # Step 1: Check what went wrong
+            print("\n📋 Analyzing failure reason...")
+            try:
+                failure_analysis = monitor_containers(
+                    f"Container {container_name} is {status}. Check its logs for the last 20 lines "
+                    f"and tell me what caused it to fail. Look for error messages, exit codes, or crash logs."
+                )
+                print(failure_analysis)
+            except Exception as e:
+                print(f"⚠️  Analysis failed: {e}")
+            
+            # Step 2: Check if restart is safe
+            print(f"\n🔍 Checking if restart is safe...")
+            try:
+                restart_safety = monitor_containers(
+                    f"Based on the failure of {container_name}, is it safe to restart? "
+                    f"Are there any configuration issues or dependencies that need fixing first?"
+                )
+                print(restart_safety)
+            except Exception as e:
+                print(f"⚠️  Safety check failed: {e}")
+            
+            print("-" * 80)
+            
+            # ================================
+            # HEALING ACTION
+            # ================================
+            print(f"\n🔧 Attempting auto-heal...")
             heal_result = heal_container(container_name)
             
             if heal_result.get('success'):
                 print(f"   ✅ Auto-heal successful! Container restarted.")
+                print(f"   📊 Restart attempts: {heal_result.get('attempts', 1)}")
+                print(f"   📊 Old status: {heal_result.get('old_status')}")
+                print(f"   📊 New status: {heal_result.get('new_status')}")
+                
+                # ================================
+                # AI DIAGNOSIS - Post-Healing Verification
+                # ================================
+                print(f"\n🤖 Post-Healing AI Verification:")
+                print("-" * 80)
+                
+                # Wait a moment for container to stabilize
+                print("⏳ Waiting 3 seconds for container to stabilize...")
+                time.sleep(3)
+                
+                try:
+                    verification = monitor_containers(
+                        f"Container {container_name} was just restarted. Check its current status and recent logs "
+                        f"to verify it's running properly without errors."
+                    )
+                    print(verification)
+                except Exception as e:
+                    print(f"⚠️  Verification failed: {e}")
+                
+                print("-" * 80)
+                
             else:
-                print(f"   ❌ Auto-heal failed: {heal_result.get('error')}")
+                print(f"   ❌ Auto-heal FAILED: {heal_result.get('error')}")
+                print(f"   📊 Attempts made: {heal_result.get('attempts', 0)}")
+                
+                # ================================
+                # AI DIAGNOSIS - Why Healing Failed
+                # ================================
+                print(f"\n🤖 AI Analysis - Why Healing Failed:")
+                print("-" * 80)
+                try:
+                    failure_reason = monitor_containers(
+                        f"Container {container_name} failed to restart after {heal_result.get('attempts', 0)} attempts. "
+                        f"Check logs and status to determine why the restart failed. What manual intervention is needed?"
+                    )
+                    print(failure_reason)
+                except Exception as e:
+                    print(f"⚠️  Failure analysis unavailable: {e}")
+                print("-" * 80)
             
-            # Send alert with heal result
-            print(f"📧 Sending alert...")
+            # Send alert with full diagnosis
+            print(f"\n📧 Sending detailed alert...")
             alert_result = send_container_down_alert(
                 container_name=container_name,
                 auto_heal_result=heal_result
             )
             
             if alert_result.get('success'):
-                print(f"   ✅ Alert sent")
+                print(f"   ✅ Alert sent successfully")
             else:
-                print(f"   ⚠️  Alert logged")
+                print(f"   ⚠️  Alert logged to file")
+            
+            print(f"\n{'=' * 80}\n")
     else:
-        print("✅ All containers healthy")
+        print("\n✅ All containers healthy")
     
     print()
     print("=" * 80)
@@ -164,13 +308,13 @@ def orchestrate_heal_once() -> Dict[str, Any]:
 
 def orchestrate_continuous(mode: str = "check"):
     """
-    CONTINUOUS monitoring loop.
+    CONTINUOUS monitoring loop with AI-powered diagnostics.
     Runs until interrupted (Ctrl+C).
     
     Args:
-        mode: "check" (monitor only) or "heal" (monitor + heal)
+        mode: "check" (monitor + AI diagnosis only) or "heal" (monitor + AI diagnosis + heal)
     """
-    mode_label = "CHECK MODE (monitor + alert only)" if mode == "check" else "HEAL MODE (monitor + heal + alert)"
+    mode_label = "CHECK MODE (AI diagnosis, no healing)" if mode == "check" else "HEAL MODE (AI diagnosis + auto-healing)"
     
     print("=" * 80)
     print(f"🔄 CONTINUOUS MONITORING - {mode_label}")
@@ -208,24 +352,48 @@ def orchestrate_continuous(mode: str = "check"):
                     
                     print(f"\n🚨 Incident Detected: {container_name} is {status}")
                     
+                    # ================================
+                    # AI QUICK DIAGNOSIS (Continuous mode - lighter analysis)
+                    # ================================
+                    print(f"\n🤖 AI Quick Diagnosis:")
+                    print("-" * 60)
+                    try:
+                        quick_diagnosis = monitor_containers(
+                            f"Container {container_name} is {status}. Quick diagnosis: "
+                            f"check last 10 log lines and identify the issue."
+                        )
+                        print(quick_diagnosis)
+                    except Exception as e:
+                        print(f"⚠️  Diagnosis unavailable: {e}")
+                    print("-" * 60)
+                    
                     if mode == "heal":
                         # HEAL MODE - Attempt healing
-                        print(f"🔧 HEAL MODE: Attempting auto-heal...")
+                        print(f"\n🔧 HEAL MODE: Attempting auto-heal...")
                         
                         heal_result = heal_container(container_name)
                         
                         if heal_result.get('success'):
                             print(f"   ✅ Auto-heal successful!")
+                            
+                            # Quick verification
+                            time.sleep(2)
+                            try:
+                                verify = monitor_containers(
+                                    f"Verify {container_name} is now running properly"
+                                )
+                                print(f"\n🤖 Verification: {verify}")
+                            except:
+                                pass
                         else:
                             print(f"   ❌ Auto-heal failed: {heal_result.get('error')}")
                         
-                        # Send alert with heal result
+                        # Send alert
                         send_container_down_alert(container_name, heal_result)
                     else:
-                        # CHECK MODE - Alert only (no healing)
-                        print(f"⚠️  CHECK MODE: Not healing, only alerting")
+                        # CHECK MODE - Alert only
+                        print(f"\n⚠️  CHECK MODE: Not healing, only alerting")
                         
-                        # Send alert without healing
                         send_container_down_alert(
                             container_name=container_name,
                             auto_heal_result={
@@ -237,7 +405,7 @@ def orchestrate_continuous(mode: str = "check"):
                         )
                         print(f"   ✅ Alert sent")
             else:
-                print("✅ All containers healthy")
+                print("\n✅ All containers healthy")
             
             print(f"\n⏳ Next check in {MONITORING_INTERVAL_SECONDS} seconds...")
             print()
@@ -258,14 +426,28 @@ def orchestrate_continuous(mode: str = "check"):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="IT Operations Orchestrator - Coordinates monitoring, alerting, and healing"
+        description="IT Operations Orchestrator - AI-Powered Container Monitoring & Healing",
+        epilog="""
+Examples:
+  # One-time check with AI diagnosis (no healing)
+  python orchestrator.py --mode check
+  
+  # One-time heal with full AI analysis
+  python orchestrator.py --mode heal
+  
+  # Continuous monitoring with AI quick diagnosis
+  python orchestrator.py --mode check --continuous
+  
+  # Continuous auto-healing with AI verification
+  python orchestrator.py --mode heal --continuous
+        """
     )
     
     parser.add_argument(
         "--mode",
         choices=["check", "heal"],
         default="check",
-        help="Operating mode: 'check' (monitor + alert only) or 'heal' (monitor + heal + alert)"
+        help="Operating mode: 'check' (AI diagnosis only) or 'heal' (AI diagnosis + auto-heal)"
     )
     
     parser.add_argument(
@@ -275,6 +457,14 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    print()
+    print("╔" + "═" * 78 + "╗")
+    print("║" + " " * 78 + "║")
+    print("║" + "  🤖 AI-POWERED IT OPERATIONS ORCHESTRATOR  ".center(78) + "║")
+    print("║" + " " * 78 + "║")
+    print("╚" + "═" * 78 + "╝")
+    print()
     
     if args.continuous:
         # Continuous monitoring loop
